@@ -1,4 +1,6 @@
-﻿using System;
+﻿using beatleader_parser.Timescale;
+using Parser.Map.Difficulty.V3.Grid;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -76,9 +78,9 @@ namespace JoshaParity
             if (rightHand) { RightHandSwings.Add(swing); }
             else { LeftHandSwings.Add(swing); }
             if (swing.notes.Count != 0) {
-                timeValue = swing.notes.Max(x => x.ms); 
+                timeValue = swing.notes.Max(x => x.Seconds * 1000); 
                 UpdateLeanState(); 
-                playerOffset = PositionData.Last(x => x.timeValue <= swing.notes[0].b).offsetValue;
+                playerOffset = PositionData.Last(x => x.timeValue <= swing.notes[0].Beats).offsetValue;
             }
         }
 
@@ -123,7 +125,7 @@ namespace JoshaParity
         /// <param name="bpmHandler">BPMHandler</param>
         /// <param name="swings">List of swings to add to</param>
         /// <returns></returns>
-        public static List<SwingData> AddResetSwingsToList(BPMHandler bpmHandler, List<SwingData> swings)
+        public static List<SwingData> AddResetSwingsToList(Timescale bpmHandler, List<SwingData> swings)
         {
             List<SwingData> result = new(swings);
             int swingsAdded = 0;
@@ -143,7 +145,7 @@ namespace JoshaParity
                 Vector2 swingPos = new(lastSwing.endPos.x + avoidanceVector.X, lastSwing.endPos.y + avoidanceVector.Y);
                 SwingData swing = new();
                 swing.swingParity = (currentSwing.swingParity == Parity.Forehand) ? Parity.Backhand : Parity.Forehand;
-                swing.swingStartBeat = lastSwing.swingEndBeat + Math.Min((nextNote.b - lastNote.b) / 2, 1);
+                swing.swingStartBeat = lastSwing.swingEndBeat + Math.Min((nextNote.Beats - lastNote.Beats) / 2, 1);
                 swing.swingEndBeat = swing.swingStartBeat + 0.1f;
                 swing.swingStartSeconds = bpmHandler.ToRealTime(swing.swingStartBeat);
                 swing.swingEndSeconds = bpmHandler.ToRealTime(swing.swingEndBeat);

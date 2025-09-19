@@ -1,4 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using beatleader_parser.Timescale;
+using Parser.Map;
+using Parser.Map.Difficulty.V3.Base;
+using Parser.Map.Difficulty.V3.Grid;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace JoshaParity
@@ -9,21 +13,22 @@ namespace JoshaParity
     public class MapAnalyser {
         private readonly Dictionary<string, List<DiffAnalysis>> _mapDiffAnalyse = [];
 
-        public SongData MapData { get; set; }
+        public BeatmapV3 MapData { get; set; }
         public Dictionary<string, List<DiffAnalysis>> MapDiffAnalyse => _mapDiffAnalyse;
 
         public MapAnalyser(string mapPath, bool preRun = true, IParityMethod? parityMethod = null) {
             parityMethod ??= new GenericParityCheck();
-            MapData = MapLoader.LoadMapFromFile(mapPath);
+
+            MapData = DiffAnalysis.parser.TryLoadPath(mapPath);
             if (preRun) AnalyseMap(parityMethod);
         }
 
         public void AnalyseMap(IParityMethod? parityMethod = null)
         {
-            foreach (DifficultyInfo diffInfo in MapData.DifficultyBeatmaps)
+            foreach (DifficultySet diffInfo in MapData.Difficulties)
             {
-                DifficultyData data = diffInfo.DifficultyData;
-                BPMHandler bpmHandler = BPMHandler.CreateBPMHandler(MapData.Song.BPM, data.BPMChanges, MapData.SongTimeOffset);
+                DifficultyV3 data = diffInfo.Data;
+                Timescale bpmHandler = Timescale.Create(MapData.Info._beatsPerMinute, data.bpmEvents, MapData.Info._songTimeOffset);
                 MapObjects mapObjects = MapObjectsFromDiff(data, bpmHandler);
                 MapSwingContainer swingContainer = SwingDataGeneration.Run(mapObjects, bpmHandler, parityMethod);
 
@@ -33,23 +38,17 @@ namespace JoshaParity
                     _mapDiffAnalyse.Add(charID, []);
                 }
 
-                _mapDiffAnalyse[charID].Add(new DiffAnalysis(diffInfo.Rank, swingContainer, bpmHandler, mapObjects));
+                _mapDiffAnalyse[charID].Add(new DiffAnalysis(diffInfo.Difficulty, swingContainer, bpmHandler, mapObjects));
             }
         }
 
-        internal static MapObjects MapObjectsFromDiff(DifficultyData data, BPMHandler bpmHandler)
+        internal static MapObjects MapObjectsFromDiff(DifficultyV3 data, Timescale bpmHandler)
         {
             List<Note> notes = new(data.Notes);
             List<Bomb> bombs = new(data.Bombs);
-            List<Obstacle> obstacles = new(data.Obstacles);
+            List<Wall> obstacles = new(data.Walls);
             List<Arc> arcs = new(data.Arcs);
             List<Chain> chains = new(data.Chains);
-
-            notes = notes.Select(x => { x.ms = bpmHandler.ToRealTime(x.b) * 1000; x.Validate(); return x; }).ToList();
-            bombs = bombs.Select(x => { x.ms = bpmHandler.ToRealTime(x.b) * 1000; return x; }).ToList();
-            obstacles = obstacles.Select(x => { x.ms = bpmHandler.ToRealTime(x.b) * 1000; return x; }).ToList();
-            arcs = arcs.Select(x => { x.ms = bpmHandler.ToRealTime(x.b) * 1000; x.tms = bpmHandler.ToRealTime(x.tms) * 1000; x.Validate(); return x; }).ToList();
-            chains = chains.Select(x => { x.ms = bpmHandler.ToRealTime(x.b) * 1000; x.tms = bpmHandler.ToRealTime(x.tms) * 1000; x.Validate(); return x; }).ToList();
 
             return new MapObjects(notes, bombs, obstacles, arcs, chains);
         }
@@ -75,14 +74,14 @@ namespace JoshaParity
         /// <param name="difficultyRank">Specific difficulty rank to retrieve data for</param>
         /// <param name="characteristic">Characteristic difficulty belongs to</param>
         /// <returns></returns>
-        public DiffAnalysis? GetDiffAnalysis(BeatmapDifficultyRank difficultyRank, string characteristic = "standard")
+        public DiffAnalysis? GetDiffAnalysis(string difficulty, string characteristic = "standard")
         {
             characteristic = characteristic.ToLower();
             if (!_mapDiffAnalyse.ContainsKey(characteristic)) return null;
 
             List<DiffAnalysis> diffAnalysis = _mapDiffAnalyse[characteristic];
             foreach (DiffAnalysis analysis in diffAnalysis) {
-                if (analysis.difficultyRank == difficultyRank) {
+                if (analysis.difficulty == difficulty) {
                     return analysis;
                 }
             }

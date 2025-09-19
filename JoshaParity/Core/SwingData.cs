@@ -1,4 +1,6 @@
-﻿using System;
+﻿using JoshaParity.Helper;
+using Parser.Map.Difficulty.V3.Grid;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -64,14 +66,14 @@ namespace JoshaParity
         public SwingData(SwingType type, List<Note> swingNotes, bool rightHand, bool startingSwing = false)
         {
             // Attempt to sort snapped swing if not all dots
-            notes = swingNotes.Count > 1 && swingNotes.All(x => Math.Abs(swingNotes[0].b) - x.b < 0.01f) && type != SwingType.Chain
+            notes = swingNotes.Count > 1 && swingNotes.All(x => Math.Abs(swingNotes[0].Beats) - x.Beats < 0.01f) && type != SwingType.Chain
                 ? new(SwingUtils.SnappedSwingSort(swingNotes))
                 : new(swingNotes);
 
             swingParity = Parity.Undecided;
             swingType = type;
-            swingStartBeat = notes[0].b;
-            swingEndBeat = notes[notes.Count - 1].b;
+            swingStartBeat = notes[0].Beats;
+            swingEndBeat = notes[notes.Count - 1].Beats;
             this.rightHand = rightHand;
 
             SetStartPosition(notes[0].x, notes[0].y);
@@ -80,18 +82,18 @@ namespace JoshaParity
             // If its the first swing, we guess parity for first hit
             if (startingSwing)
             {
-                Dictionary<int, float> selectedDict = (notes[0].d is 0 or 4 or 5)
+                Dictionary<int, float> selectedDict = (notes[0].CutDirection is 0 or 4 or 5)
                     ? ParityUtils.BackhandDict(rightHand) : ParityUtils.ForehandDict(rightHand);
 
-                swingParity = (notes[0].d is 0 or 4 or 5)
+                swingParity = (notes[0].CutDirection is 0 or 4 or 5)
                     ? Parity.Backhand : Parity.Forehand;
 
-                SetStartAngle(selectedDict[notes[0].d]);
-                SetEndAngle(selectedDict[notes[notes.Count - 1].d]);
+                SetStartAngle(selectedDict[notes[0].CutDirection]);
+                SetEndAngle(selectedDict[notes[notes.Count - 1].CutDirection]);
             }
 
-            if (notes[0] is Chain chain) {
-                swingEndBeat = chain.tb;
+            if (notes[0] is TempChain chain) {
+                swingEndBeat = chain.TailInBeats;
                 SetEndPosition(chain.tx, chain.ty);
             }
         }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Parser.Map.Difficulty.V3.Grid;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -44,19 +45,19 @@ namespace JoshaParity
                 context.SwingContext.LeftHandSwings.Last();
             Note nextNote = currentSwing.notes[0];
             Note lastNote = lastSwing.notes[lastSwing.notes.Count - 1];
-            List<Bomb> bombList = context.MapContext.Bombs.FindAll(x => x.b > lastNote.b + 0.01f && x.b < nextNote.b - 0.01f);
+            List<Bomb> bombList = context.MapContext.Bombs.FindAll(x => x.Beats > lastNote.Beats + 0.01f && x.Beats < nextNote.Beats - 0.01f);
             int prevCutDir;
             int cutDir;
 
             // If the last swing is all dots, get angle from prev parity and rotation
-            prevCutDir = lastSwing.notes.All(x => x.d == 8)
+            prevCutDir = lastSwing.notes.All(x => x.CutDirection == 8)
                 ? SwingUtils.CutDirFromAngleParity(lastSwing.endPos.rotation, lastSwing.swingParity, rightHand, 45.0f)
-                : lastSwing.notes.First(x => x.d != 8).d;
+                : lastSwing.notes.First(x => x.CutDirection != 8).CutDirection;
 
             // If current swing is all dots, get angle from direction from last to next note
-            cutDir = currentSwing.notes.All(x => x.d == 8)
+            cutDir = currentSwing.notes.All(x => x.CutDirection == 8)
                 ? SwingUtils.OpposingCutDict[SwingUtils.CutDirFromNoteToNote(lastNote, nextNote)]
-                : currentSwing.notes.First(x => x.d != 8).d;
+                : currentSwing.notes.First(x => x.CutDirection != 8).CutDirection;
 
             // Calculate Prev AFN and opposite parity Next AFN
             float currentAFN = (lastSwing.swingParity != Parity.Forehand) ?
@@ -74,8 +75,8 @@ namespace JoshaParity
             switch (lastSwing.swingParity)
             {
                 // Determines if potentially an upside down hit based on note cut direction and last swing angle
-                case Parity.Backhand when (lastSwing.endPos.rotation > 0 && nextNote.d == 0) || nextNote.d == 8:
-                case Parity.Forehand when (lastSwing.endPos.rotation > 0 && nextNote.d == 1) || nextNote.d == 8:
+                case Parity.Backhand when (lastSwing.endPos.rotation > 0 && nextNote.CutDirection == 0) || nextNote.CutDirection == 8:
+                case Parity.Forehand when (lastSwing.endPos.rotation > 0 && nextNote.CutDirection == 1) || nextNote.CutDirection == 8:
                     currentSwing.SetUpsideDown(true);
                     break;
             }
@@ -90,15 +91,15 @@ namespace JoshaParity
             const float timeSnap = 0.05f;
 
             // Construct play-space grid with bombs at a set interval of beats
-            foreach (Bomb bomb in bombList.OrderBy(x => x.b))
+            foreach (Bomb bomb in bombList.OrderBy(x => x.Beats))
             {
-                if (bombsToAdd.Count == 0 || Math.Abs(bomb.b - bombsToAdd.First().b) <= timeSnap)
+                if (bombsToAdd.Count == 0 || Math.Abs(bomb.Beats - bombsToAdd.First().Beats) <= timeSnap)
                 {
                     bombsToAdd.Add(bomb);
                 }
                 else
                 {
-                    BeatGrid grid = new(bombsToAdd, bombsToAdd[0].b);
+                    BeatGrid grid = new(bombsToAdd, bombsToAdd[0].Beats);
                     intervalGrids.Add(grid);
                     bombsToAdd.Clear();
                     bombsToAdd.Add(bomb);
@@ -108,7 +109,7 @@ namespace JoshaParity
             // Catch extra bombs outside the interval at the end, and create grid
             if (bombsToAdd.Count > 0)
             {
-                BeatGrid lastGrid = new(bombsToAdd, bombsToAdd[0].b);
+                BeatGrid lastGrid = new(bombsToAdd, bombsToAdd[0].Beats);
                 intervalGrids.Add(lastGrid);
             }
 
@@ -118,7 +119,7 @@ namespace JoshaParity
             for (int i = 0; i < intervalGrids.Count; i++)
             {
                 // Get the previous cut direction, rounded differently if a dot to help detection
-                int cutDirT = lastSwing.notes.All(x => x.d == 8) ?
+                int cutDirT = lastSwing.notes.All(x => x.CutDirection == 8) ?
                     SwingUtils.CutDirFromAngleParity(lastSwing.endPos.rotation, simulatedParity) :
                     SwingUtils.CutDirFromAngleParity(lastSwing.endPos.rotation, simulatedParity, rightHand, 45.0f);
 
@@ -135,7 +136,7 @@ namespace JoshaParity
 
                 // If the simulated parity differs from previous parity, possible reset, if not, we can leave
                 bool bombResetIndicated = simulatedParity != lastSwing.swingParity;
-                if (currentSwing.notes.All(x => x.d == 8))
+                if (currentSwing.notes.All(x => x.CutDirection == 8))
                 {
                     bombResetIndicated = simulatedParity != lastSwing.swingParity ||
                                          simulatedHandPos.X != lastSwing.endPos.x ||
@@ -145,14 +146,14 @@ namespace JoshaParity
 
                 // Performs a check to check occassional false flags that are likely unintended
                 // If the next swing isn't entirely dots, attempt to calculate next parity
-                if (currentSwing.notes.Any(x => x.d != 8))
+                if (currentSwing.notes.Any(x => x.CutDirection != 8))
                 {
                     // As a rule of thumb:
                     // If the rotation is bigger when the next swing is forehand, we go backhand, and vice versa
 
                     // Calculate AFN values
-                    float forehandAFN = ParityUtils.ForehandDict(rightHand)[currentSwing.notes.First(x => x.d != 8).d];
-                    float backhandAFN = ParityUtils.BackhandDict(rightHand)[currentSwing.notes.First(x => x.d != 8).d];
+                    float forehandAFN = ParityUtils.ForehandDict(rightHand)[currentSwing.notes.First(x => x.CutDirection != 8).CutDirection];
+                    float backhandAFN = ParityUtils.BackhandDict(rightHand)[currentSwing.notes.First(x => x.CutDirection != 8).CutDirection];
 
                     if (Math.Abs(forehandAFN) > Math.Abs(backhandAFN))
                     {
@@ -178,7 +179,7 @@ namespace JoshaParity
             #region FINISH CALC
 
             // If last cut is entirely dot notes and next cut is too, then parity is assumed to be maintained
-            if (currentSwing.notes.All(x => x.d == 8)) {
+            if (currentSwing.notes.All(x => x.CutDirection == 8)) {
                 return (lastSwing.swingParity == Parity.Forehand) ? Parity.Backhand : Parity.Forehand;
             }
 

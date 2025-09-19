@@ -1,4 +1,7 @@
-﻿using System;
+﻿using beatleader_parser.Timescale;
+using JoshaParity.Helper;
+using Parser.Map.Difficulty.V3.Grid;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -12,18 +15,18 @@ namespace JoshaParity
     {
         public List<Note> Notes { get; set; }
         public List<Bomb> Bombs { get; }
-        public List<Obstacle> Obstacles { get; }
+        public List<Wall> Obstacles { get; }
         public List<Arc> Arcs { get; }
         public List<Chain> Chains { get; }
 
         /// <summary>
         /// Creates a new, clean copy of MapObjects
         /// </summary>
-        public MapObjects(List<Note> notes, List<Bomb> bombs, List<Obstacle> walls, List<Arc> arcs, List<Chain> chains)
+        public MapObjects(List<Note> notes, List<Bomb> bombs, List<Wall> walls, List<Arc> arcs, List<Chain> chains)
         {
             Notes = new List<Note>(notes);
             Bombs = new List<Bomb>(bombs);
-            Obstacles = new List<Obstacle>(walls);
+            Obstacles = new List<Wall>(walls);
             Arcs = new List<Arc>(arcs);
             Chains = new List<Chain>(chains);
         }
@@ -37,7 +40,7 @@ namespace JoshaParity
         #region Variables
 
         private static IParityMethod ParityMethodology = new GenericParityCheck();
-        public static BPMHandler BpmHandler = BPMHandler.CreateBPMHandler(0,new(),0);
+        public static Timescale BpmHandler = Timescale.Create(0,new(),0);
         public static MapSwingContainer mainContainer = new();
         public static MapObjects? _mapData;
 
@@ -49,7 +52,7 @@ namespace JoshaParity
         /// <param name="mapObjects">Map Objects</param>
         /// <param name="BPMHandler">BPM Handler for the difficulty containing base BPM and BPM Changes</param>
         /// <param name="parityMethod">Optional: Parity Check Logic</param>
-        public static MapSwingContainer Run(MapObjects mapObjects, BPMHandler BPMHandler, IParityMethod? parityMethod = null)
+        public static MapSwingContainer Run(MapObjects mapObjects, Timescale BPMHandler, IParityMethod? parityMethod = null)
         {
             ParityMethodology = parityMethod ?? new GenericParityCheck();
             BpmHandler = BPMHandler;
@@ -69,17 +72,15 @@ namespace JoshaParity
         public static MapSwingContainer SimulateSwings(MapSwingContainer curState, MapObjects mapData) {
             // Reference Fix and Remove Prior Notes
             MapObjects mapObjects = new(mapData.Notes, mapData.Bombs, mapData.Obstacles, mapData.Arcs, mapData.Chains);
-            mapObjects.Notes.RemoveAll(x => x.ms < curState.timeValue);
-            mapObjects.Chains.RemoveAll(x => x.ms < curState.timeValue);
+            mapObjects.Notes.RemoveAll(x => x.Seconds * 1000 < curState.timeValue);
+            mapObjects.Chains.RemoveAll(x => x.Seconds * 1000 < curState.timeValue);
 
-            List<Note> parityObjects = new(mapObjects.Notes);
-            parityObjects.AddRange(mapObjects.Chains);
-            parityObjects = parityObjects.OrderBy(x => x.ms).ToList();
+            List<Note> parityObjects = TempChain.PreprocessDataForBuffer(mapObjects.Chains).Cast<Note>().ToList();
 
             if (parityObjects.Count == 0) { return curState; }
 
-            int lastLeftIndex = parityObjects.FindLastIndex(x => x.c == 0);
-            int lastRightIndex = parityObjects.FindLastIndex(x => x.c == 1);
+            int lastLeftIndex = parityObjects.FindLastIndex(x => x.Color == 0);
+            int lastRightIndex = parityObjects.FindLastIndex(x => x.Color == 1);
 
             // Foreach note going forwards
             for (int i = 0; i < parityObjects.Count; i++)
@@ -87,13 +88,13 @@ namespace JoshaParity
                 Note currentNote = parityObjects[i];
 
                 // Depending on hand, update buffer
-                if (currentNote.c == 0) { 
+                if (currentNote.Color == 0) { 
                     (SwingType leftSwingType, List<Note> leftNotesInSwing) = curState.leftHandConstructor.UpdateBuffer(currentNote);
                     if (leftSwingType != SwingType.Undecided) {
                         if (leftNotesInSwing.Count != 0) curState.AddSwing(ConfigureSwing(curState, mapObjects, leftNotesInSwing, leftSwingType, false), false);
                     }
                 }
-                else if (currentNote.c == 1) { 
+                else if (currentNote.Color == 1) { 
                     (SwingType rightSwingType, List<Note> rightNotesInSwing) = curState.rightHandConstructor.UpdateBuffer(currentNote);
                     if (rightSwingType != SwingType.Undecided) {
                         if (rightNotesInSwing.Count != 0) curState.AddSwing(ConfigureSwing(curState, mapObjects, rightNotesInSwing, rightSwingType, true), true);
@@ -154,7 +155,7 @@ namespace JoshaParity
             // Get swing EBPM
             Note lastNote = lastSwing.notes[lastSwing.notes.Count - 1];
             Note currentNote = sData.notes[0];
-            sData.swingEBPM = TimeUtils.SwingEBPM(BpmHandler, lastNote.b, currentNote.b);
+            sData.swingEBPM = TimeUtils.SwingEBPM(BpmHandler, lastNote.Beats, currentNote.Beats);
             if (lastSwing.IsReset) { sData.swingEBPM *= 2; }
 
             // Calculate Parity
@@ -162,21 +163,21 @@ namespace JoshaParity
 
             // Setting angles for: Single-Note Swings
             if (sData.notes.Count == 1) {
-                if (sData.notes.All(x => x.d == 8)) { 
+                if (sData.notes.All(x => x.CutDirection == 8)) { 
                     SwingUtils.DotCutDirectionCalc(lastSwing, ref sData, true); 
                 } else {
                     // Get Parity Dictionary
                     Dictionary<int, float> parityDict = (sData.swingParity == Parity.Backhand) ?
                         ParityUtils.BackhandDict(isRightHand) : ParityUtils.ForehandDict(isRightHand);
 
-                    sData.SetStartAngle(parityDict[sData.notes[0].d]);
-                    sData.SetEndAngle(parityDict[sData.notes[0].d]);
+                    sData.SetStartAngle(parityDict[sData.notes[0].CutDirection]);
+                    sData.SetEndAngle(parityDict[sData.notes[0].CutDirection]);
                 }
             } else {
                 // Setting angles for: Multi-note Snapped Swings
-                if (sData.notes.All(x => Math.Abs(sData.notes[0].b - x.b) < 0.01f)) {
+                if (sData.notes.All(x => Math.Abs(sData.notes[0].Beats - x.Beats) < 0.01f)) {
                     // Snapped all dots, else:
-                    if (sData.notes.All(x => x.d == 8)) { 
+                    if (sData.notes.All(x => x.CutDirection == 8)) { 
                         SwingUtils.SnappedDotSwingAngleCalc(lastSwing, ref sData); 
                     } else { 
                         SwingUtils.SliderAngleCalc(ref sData); 
@@ -189,7 +190,7 @@ namespace JoshaParity
             // Temporary Angle Flip till lean is fully implemented:
             if (sData.upsideDown)
             {
-                if (sData.notes.All(x => x.d != 8))
+                if (sData.notes.All(x => x.CutDirection != 8))
                 {
                     sData.SetStartAngle(sData.startPos.rotation * -1);
                     sData.SetEndAngle(sData.endPos.rotation * -1);
@@ -204,24 +205,24 @@ namespace JoshaParity
         /// </summary>
         /// <param name="obstacle"></param>
         /// <returns></returns>
-        private static Vector2 WallImpactAssess(Obstacle obstacle, Obstacle lastObstacle)
+        private static Vector2 WallImpactAssess(Wall obstacle, Wall lastObstacle)
         {
             Vector2 returnVec = Vector2.Zero;
 
-            if ((obstacle.w >= 3 && obstacle.x <= 1) || (obstacle.w >= 2 && obstacle.x == 1))
+            if ((obstacle.Width >= 3 && obstacle.x <= 1) || (obstacle.Width >= 2 && obstacle.x == 1))
             {
                 returnVec.Y = -0.7f;  // Duck
             }
-            else if ((obstacle.x == 1 || (obstacle.x == 0 && obstacle.w > 1)) && (lastObstacle.x == 2) && obstacle.b + obstacle.d - (lastObstacle.b + lastObstacle.d) < 0.5f)
+            else if ((obstacle.x == 1 || (obstacle.x == 0 && obstacle.Width > 1)) && (lastObstacle.x == 2) && obstacle.Beats + obstacle.DurationInBeats - (lastObstacle.Beats + lastObstacle.DurationInBeats) < 0.5f)
             {
                 return new(0,-0.7f);  // Duck
             }
-            else if ((obstacle.x == 2) && (lastObstacle.x == 1 || (lastObstacle.x == 0 && lastObstacle.w > 1)) && obstacle.b + obstacle.d - (lastObstacle.b + lastObstacle.d) < 0.5f)
+            else if ((obstacle.x == 2) && (lastObstacle.x == 1 || (lastObstacle.x == 0 && lastObstacle.Width > 1)) && obstacle.Beats + obstacle.DurationInBeats - (lastObstacle.Beats + lastObstacle.DurationInBeats) < 0.5f)
             {
                 return new(0, -0.7f);  // Duck
             }
 
-            if ((obstacle.x == 1 && obstacle.w <= 1) || (obstacle.x == 0 && obstacle.w == 2)) {
+            if ((obstacle.x == 1 && obstacle.Width <= 1) || (obstacle.x == 0 && obstacle.Width == 2)) {
                 returnVec.X = 0.55f;  // Dodge Right
             }
             else if (obstacle.x == 2)
@@ -237,19 +238,19 @@ namespace JoshaParity
         /// </summary>
         /// <param name="obstacles">List of V3 obstacles</param>
         /// <returns></returns>
-        private static List<OffsetData> CalculateOffsetData(List<Obstacle> obstacles)
+        private static List<OffsetData> CalculateOffsetData(List<Wall> obstacles)
         {
             List<OffsetData> offsetData = new();
-            Obstacle lastInteractive = new();
+            Wall lastInteractive = new();
 
             // Old Method:
-            foreach (Obstacle obstacle in obstacles) {
+            foreach (Wall obstacle in obstacles) {
                 Vector2 pOffset = WallImpactAssess(obstacle, lastInteractive);
-                if (pOffset == Vector2.Zero && obstacle.b < lastInteractive.b + lastInteractive.d) { continue; }
-                if (obstacle.b > lastInteractive.b + lastInteractive.d + 1f) { offsetData.Add(new() { timeValue = lastInteractive.b + lastInteractive.d + 1f, offsetValue = new(0, 0) }); }
+                if (pOffset == Vector2.Zero && obstacle.Beats < lastInteractive.Beats + lastInteractive.DurationInBeats) { continue; }
+                if (obstacle.Beats > lastInteractive.Beats + lastInteractive.DurationInBeats + 1f) { offsetData.Add(new() { timeValue = lastInteractive.Beats + lastInteractive.DurationInBeats + 1f, offsetValue = new(0, 0) }); }
                 lastInteractive = obstacle;
-                offsetData.Add(new() { timeValue = obstacle.b, offsetValue = pOffset });
-                offsetData.Add(new() { timeValue = obstacle.b + obstacle.d, offsetValue = pOffset });
+                offsetData.Add(new() { timeValue = obstacle.Beats, offsetValue = pOffset });
+                offsetData.Add(new() { timeValue = obstacle.Beats + obstacle.DurationInBeats, offsetValue = pOffset });
             }
 
             offsetData.OrderBy(x => x.timeValue);

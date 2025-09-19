@@ -1,4 +1,8 @@
-﻿using System;
+﻿using beatleader_parser;
+using beatleader_parser.Timescale;
+using Parser.Map;
+using Parser.Map.Difficulty.V3.Grid;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -16,50 +20,42 @@ namespace JoshaParity
             Left, Right, Both
         }
 
-        public BeatmapDifficultyRank difficultyRank = BeatmapDifficultyRank.ExpertPlus;
+        public string difficulty = "ExpertPlus";
         public MapSwingContainer swingContainer = new();
-        public BPMHandler bpmHandler = new(0, [], 0);
+        public Timescale bpmHandler = new(0, [], 0);
         public MapObjects mapObjects = new([], [], [], [], []);
+        public static Parse parser = new();
 
         /// <summary>
         /// Constructor when SwingData is already computed
         /// </summary>
-        public DiffAnalysis(BeatmapDifficultyRank difficultyRank, MapSwingContainer container, BPMHandler bpmHandler, MapObjects mapObjects)
+        public DiffAnalysis(string difficultyName, MapSwingContainer container, Timescale bpmHandler, MapObjects mapObjects)
         {
-            this.difficultyRank = difficultyRank;
+            this.difficulty = difficultyName;
             swingContainer = container;
             this.bpmHandler = bpmHandler;
             this.mapObjects = mapObjects;
         }
 
         /// <summary>
-        ///  Constructor without Info.dat
-        /// </summary>
-        public DiffAnalysis(string difficultyDatContents, float bpm, BeatmapDifficultyRank difficultyRank, float songOffset = 0, IParityMethod? parityMethod = null)
-        {
-            this.difficultyRank = difficultyRank;
-            Init(difficultyDatContents, bpm, songOffset, parityMethod);
-        }
-
-        /// <summary>
         /// Constructor with Info.dat
         /// </summary>
-        public DiffAnalysis(string infoDatContents, string difficultyDatContents, BeatmapDifficultyRank difficultyRank, IParityMethod? parityMethod = null)
+        public DiffAnalysis(List<(string filename, string json)> data, string difficultyName, float songLength, IParityMethod? parityMethod = null)
         {
-            SongData mapInfo = MapLoader.LoadMapFromString(infoDatContents);
-            this.difficultyRank = difficultyRank;
-            Init(difficultyDatContents, mapInfo.Song.BPM, mapInfo.SongTimeOffset, parityMethod);
+            var mapInfo = parser.TryLoadString(data, songLength).FirstOrDefault();
+            var diff = mapInfo.Difficulties.Where(x => x.Difficulty == difficultyName).FirstOrDefault();
+            Init(mapInfo, diff, parityMethod);
         }
 
         /// <summary>
         /// Initialisation Helper Function
         /// </summary>
-        private void Init(string difficultyDatContents, float bpm, float songOffset = 0, IParityMethod? parityMethod = null)
+        private void Init(BeatmapV3 beatmap, DifficultySet data, IParityMethod? parityMethod = null)
         {
-            DifficultyData diffData = MapLoader.LoadDifficultyFromString(difficultyDatContents);
-            bpmHandler = BPMHandler.CreateBPMHandler(bpm, diffData.BPMChanges, songOffset);
+            Timescale
+            bpmHandler = Timescale.Create(beatmap.Info._beatsPerMinute, data.Data.bpmEvents, beatmap.Info._songTimeOffset);
             IParityMethod ParityMethodology = parityMethod ?? new GenericParityCheck();
-            mapObjects = MapAnalyser.MapObjectsFromDiff(diffData, bpmHandler);
+            mapObjects = MapAnalyser.MapObjectsFromDiff(data.Data, bpmHandler);
             swingContainer = SwingDataGeneration.Run(mapObjects, bpmHandler, ParityMethodology);
         }
 
@@ -80,9 +76,9 @@ namespace JoshaParity
         public float GetNPS(HandResult hand)
         {
             int handColour = hand == HandResult.Left ? 0 : 1;
-            IEnumerable<Note> notes = hand == HandResult.Both ? mapObjects.Notes : mapObjects.Notes.Where(n => n.c == handColour);
-            notes.OrderBy(x => x.ms);
-            return notes.Any() ? notes.Count() / ((notes.Last().ms / 1000) - (notes.First().ms / 1000)) : 0;
+            IEnumerable<Note> notes = hand == HandResult.Both ? mapObjects.Notes : mapObjects.Notes.Where(n => n.Color == handColour);
+            notes.OrderBy(x => x.Beats);
+            return notes.Any() ? notes.Count() / (notes.Last().Seconds - notes.First().Seconds) : 0;
         }
 
         /// <summary>
@@ -109,10 +105,10 @@ namespace JoshaParity
             List<SwingData> rightHand = swingContainer.RightHandSwings.ToList();
 
             float leftSPS = (leftHand.Count == 0) ?
-                0 : leftHand.Count / TimeUtils.BeatToSeconds(bpmHandler.BPM,
+                0 : leftHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(),
                     leftHand.Last().swingEndBeat - leftHand.First().swingStartBeat);
             float rightSPS = (rightHand.Count == 0) ?
-                0 : rightHand.Count / TimeUtils.BeatToSeconds(bpmHandler.BPM,
+                0 : rightHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(),
                     rightHand.Last().swingEndBeat - rightHand.First().swingStartBeat);
 
             // Depending on result type, return SPS
@@ -209,7 +205,7 @@ namespace JoshaParity
             // Threshold in ms for when swings are considered at the same time
             double threshold = 0.05;
             List<SwingData> matchedSwings = leftHand
-                .Where(leftSwing => rightHand.Any(rightSwing => Math.Abs(leftSwing.notes[0].ms - rightSwing.notes[0].ms) <= threshold))
+                .Where(leftSwing => rightHand.Any(rightSwing => Math.Abs(leftSwing.notes[0].Seconds * 1000 - rightSwing.notes[0].Seconds * 1000) <= threshold))
                 .ToList();
 
             return (float)matchedSwings.Count / (leftHand.Count + rightHand.Count) * 100;
@@ -278,7 +274,7 @@ namespace JoshaParity
         public override string ToString()
         {
             StringBuilder sb = new();
-            sb.AppendLine($"{difficultyRank}");
+            sb.AppendLine($"{difficulty}");
             sb.AppendLine("-----------------------");
             sb.AppendLine($"Potential Resets:");
             sb.AppendLine($" - Normal Resets: {GetResetCount(ResetType.Rebound)}");

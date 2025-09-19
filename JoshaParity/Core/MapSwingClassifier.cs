@@ -1,4 +1,7 @@
-﻿using System;
+﻿using JoshaParity.Helper;
+using Parser.Map.Difficulty.V3.Base;
+using Parser.Map.Difficulty.V3.Grid;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -38,15 +41,17 @@ namespace JoshaParity
         /// </summary>
         /// <param name="nextNote">Note to add to the buffer</param>
         /// <returns></returns>
-        public (SwingType type, List<Note> notes) UpdateBuffer(Note nextNote)
+        public (SwingType type, List<Note> notes) UpdateBuffer(Note note)
         {
+            Note nextNote = note;
+
             if (!_noMoreData)
             {
                 // If first note, add and return
                 if (_notesBuffer.Count == 0)
                 {
-                    _notesBuffer.Add(nextNote);
-                    if (_notesBuffer[0] is Chain) {
+                    _notesBuffer.Add((nextNote));
+                    if (note is TempChain) {
                         return (SwingType.Chain, new(_notesBuffer));
                     }
                     return (SwingType.Undecided, new(_notesBuffer));
@@ -55,12 +60,12 @@ namespace JoshaParity
                 // Get current note check if slider precision applies
                 Note currentNote = _notesBuffer[_notesBuffer.Count - 1];
                 const float sliderPrecision = 59f; // In miliseconds
-                float timeDiff = Math.Abs(currentNote.ms - nextNote.ms);
-                if (timeDiff <= sliderPrecision && currentNote is not Chain)
+                float timeDiff = Math.Abs(currentNote.Seconds * 1000 - nextNote.Seconds * 1000);
+                if (timeDiff <= sliderPrecision)
                 {
-                    if (nextNote.d == 8 || currentNote.d == 8 ||
-                        currentNote.d == nextNote.d || Math.Abs(ParityUtils.ForehandDict(true)[currentNote.d] - ParityUtils.ForehandDict(true)[nextNote.d]) <= 45 ||
-                         Math.Abs(ParityUtils.BackhandDict(true)[currentNote.d] - ParityUtils.BackhandDict(true)[nextNote.d]) <= 45)
+                    if (nextNote.CutDirection == 8 || currentNote.CutDirection == 8 ||
+                        currentNote.CutDirection == nextNote.CutDirection || Math.Abs(ParityUtils.ForehandDict(true)[currentNote.CutDirection] - ParityUtils.ForehandDict(true)[nextNote.CutDirection]) <= 45 ||
+                         Math.Abs(ParityUtils.BackhandDict(true)[currentNote.CutDirection] - ParityUtils.BackhandDict(true)[nextNote.CutDirection]) <= 45)
                     { _notesBuffer.Add(nextNote); return (SwingType.Undecided, new(_notesBuffer)); }
                 }
 
@@ -75,8 +80,8 @@ namespace JoshaParity
 
             // Fixes when there is a note and chain on same snap, color, direction,
             // prioritising the chain (Found this in sesh the seven seas: 376a6)
-            if (_constructedSwing.Count(x => x is Chain) > 0) {
-                _constructedSwing.RemoveAll(x => x is not Chain);
+            if (_constructedSwing.Count(x => x is TempChain) > 0) {
+                _constructedSwing.RemoveAll(x => x is not TempChain);
                 return (SwingType.Chain, new(_constructedSwing));
             }
 
@@ -85,7 +90,7 @@ namespace JoshaParity
 
             if (_constructedSwing.Count > 1)
             {
-                if (_constructedSwing.All(x => Math.Abs(_constructedSwing[0].b - x.b) < 0.01f))
+                if (_constructedSwing.All(x => Math.Abs(_constructedSwing[0].Beats - x.Beats) < 0.01f))
                 {
                     if (IsStack()) { returnType = SwingType.Stack; }
                     if (IsWindow()) { returnType = SwingType.Window; }

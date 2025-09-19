@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Parser.Map.Difficulty.V3.Grid;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -68,12 +69,12 @@ namespace JoshaParity
         public static List<Note> SnappedSwingSort(List<Note> notesToSort)
         {
             // Refactored Method:
-            if (notesToSort.Any(x => x.d != 8)) {
+            if (notesToSort.Any(x => x.CutDirection != 8)) {
                 Vector2 totalDirection = Vector2.Zero;
                 foreach (Note note in notesToSort)
                 {
-                    if (note.d == 8) continue;
-                    totalDirection += DirectionalVectors[note.d];
+                    if (note.CutDirection == 8) continue;
+                    totalDirection += DirectionalVectors[note.CutDirection];
                 }
                 Vector2 avgDirection = totalDirection / notesToSort.Count;
 
@@ -92,9 +93,9 @@ namespace JoshaParity
             // Get the direction vector ATB
             // Check if any cut directions oppose this, if so, flip to BTA
             Vector2 atb = noteBPos - noteAPos;
-            if (notesToSort.Any(x => x.d != 8))
+            if (notesToSort.Any(x => x.CutDirection != 8))
             {
-                bool reverseOrder = notesToSort.Any(note => note.d != 8 && Vector2.Dot(DirectionalVectors[note.d], atb) < 0);
+                bool reverseOrder = notesToSort.Any(note => note.CutDirection != 8 && Vector2.Dot(DirectionalVectors[note.CutDirection], atb) < 0);
                 if (reverseOrder) atb = -atb;
             }
 
@@ -197,13 +198,13 @@ namespace JoshaParity
             int lastCutDir;
             if (currentSwing.notes.Count == 2) {
                 // If arrow, take the cutDir, else approximate direction from first to last note.
-                firstCutDir = (firstNote.d != 8) ? firstNote.d : CutDirFromNoteToNote(lastNote, firstNote);
-                lastCutDir = (lastNote.d != 8) ? lastNote.d : CutDirFromNoteToNote(lastNote, firstNote);
+                firstCutDir = (firstNote.CutDirection != 8) ? firstNote.CutDirection : CutDirFromNoteToNote(lastNote, firstNote);
+                lastCutDir = (lastNote.CutDirection != 8) ? lastNote.CutDirection : CutDirFromNoteToNote(lastNote, firstNote);
             } else {
                 // If arrow, take the cutDir, else approximate direction from first to last note.
                 Note middleNote = currentSwing.notes[currentSwing.notes.Count / 2];
-                firstCutDir = (firstNote.d != 8) ? firstNote.d : CutDirFromNoteToNote(middleNote, firstNote);
-                lastCutDir = (lastNote.d != 8) ? lastNote.d : CutDirFromNoteToNote(lastNote, middleNote);
+                firstCutDir = (firstNote.CutDirection != 8) ? firstNote.CutDirection : CutDirFromNoteToNote(middleNote, firstNote);
+                lastCutDir = (lastNote.CutDirection != 8) ? lastNote.CutDirection : CutDirFromNoteToNote(lastNote, middleNote);
             }
 
             float startAngle = (currentSwing.swingParity == Parity.Forehand) ? ParityUtils.ForehandDict(currentSwing.rightHand)[firstCutDir] : ParityUtils.BackhandDict(currentSwing.rightHand)[firstCutDir];

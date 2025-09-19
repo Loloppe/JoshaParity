@@ -1,4 +1,6 @@
-﻿namespace JoshaParity
+﻿using beatleader_parser.Timescale;
+
+namespace JoshaParity
 {
     /// <summary>
     /// Time utility related functionalities
@@ -12,7 +14,7 @@
         /// <param name="startBeat">Beat time of last swing</param>
         /// <param name="endBeat">Beat time of current swing</param>
         /// <returns></returns>
-        public static float SwingEBPM(BPMHandler bpmHandler, float startBeat, float endBeat)
+        public static float SwingEBPM(Timescale bpmHandler, float startBeat, float endBeat)
         {
             if (startBeat == 0 && endBeat == 0) { return 0; }
             float secondsDiff = bpmHandler.ToRealTime(endBeat) - bpmHandler.ToRealTime(startBeat);
@@ -37,7 +39,7 @@
         /// <param name="startBeat">Beat time of last swing</param>
         /// <param name="endBeat">Beat time of current swing</param>
         /// <returns></returns>
-        public static float BeatsToSeconds(BPMHandler bpmHandler, float startBeat, float endBeat)
+        public static float BeatsToSeconds(Timescale bpmHandler, float startBeat, float endBeat)
         {
             return startBeat == 0 && endBeat == 0 ? 0 : bpmHandler.ToRealTime(endBeat) - bpmHandler.ToRealTime(startBeat);
         }
