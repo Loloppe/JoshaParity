@@ -24,8 +24,8 @@ namespace JoshaParity.Helper
             {
                 TempChain tempChain = new()
                 {
-                    x = chain.tx,
-                    y = chain.ty,
+                    x = chain.x,
+                    y = chain.y,
                     tx = chain.tx,
                     ty = chain.ty,
                     TailInBeats = chain.TailInBeats,
@@ -42,6 +42,21 @@ namespace JoshaParity.Helper
                 result.Add(tempChain);
             }
 
+            result = result.OrderBy(x => x.Beats).ToList();
+
+            return result;
+        }
+
+        public static List<Note> RemoveHeadNote(List<Note> notes, List<TempChain> chains)
+        {
+            List<Note> result = notes.ToList();
+            List<Note> found = new();
+            foreach (var chain in chains)
+            {
+                found.AddRange(notes.Where(x => x.Beats == chain.Beats && x.x == chain.x && x.y == chain.y && x.Color == chain.Color && x.CutDirection == chain.CutDirection).ToList());
+            }
+
+            found.ForEach(x => result.Remove(x));
             result = result.OrderBy(x => x.Beats).ToList();
 
             return result;

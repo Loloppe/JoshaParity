@@ -60,8 +60,7 @@ namespace JoshaParity
         /// </summary>
         private void Init(BeatmapV3 beatmap, DifficultySet data, IParityMethod? parityMethod = null)
         {
-            Timescale
-            bpmHandler = Timescale.Create(beatmap.Info._beatsPerMinute, data.Data.bpmEvents, beatmap.Info._songTimeOffset);
+            Timescale bpmHandler = Timescale.Create(beatmap.Info._beatsPerMinute, data.Data.bpmEvents, beatmap.Info._songTimeOffset);
             IParityMethod ParityMethodology = parityMethod ?? new GenericParityCheck();
             mapObjects = MapAnalyser.MapObjectsFromDiff(data.Data, bpmHandler);
             swingContainer = SwingDataGeneration.Run(mapObjects, bpmHandler, ParityMethodology);
@@ -85,7 +84,7 @@ namespace JoshaParity
         {
             int handColour = hand == HandResult.Left ? 0 : 1;
             IEnumerable<Note> notes = hand == HandResult.Both ? mapObjects.Notes : mapObjects.Notes.Where(n => n.Color == handColour);
-            notes.OrderBy(x => x.Beats);
+            notes = notes.OrderBy(x => x.Seconds * 1000);
             return notes.Any() ? notes.Count() / (notes.Last().Seconds - notes.First().Seconds) : 0;
         }
 

@@ -1,5 +1,4 @@
 ﻿using JoshaParity.Helper;
-using Parser.Map.Difficulty.V3.Base;
 using Parser.Map.Difficulty.V3.Grid;
 using System;
 using System.Collections.Generic;
@@ -41,17 +40,15 @@ namespace JoshaParity
         /// </summary>
         /// <param name="nextNote">Note to add to the buffer</param>
         /// <returns></returns>
-        public (SwingType type, List<Note> notes) UpdateBuffer(Note note)
+        public (SwingType type, List<Note> notes) UpdateBuffer(Note nextNote)
         {
-            Note nextNote = note;
-
             if (!_noMoreData)
             {
                 // If first note, add and return
                 if (_notesBuffer.Count == 0)
                 {
-                    _notesBuffer.Add((nextNote));
-                    if (note is TempChain) {
+                    _notesBuffer.Add(nextNote);
+                    if (_notesBuffer[0] is TempChain) {
                         return (SwingType.Chain, new(_notesBuffer));
                     }
                     return (SwingType.Undecided, new(_notesBuffer));
@@ -61,7 +58,8 @@ namespace JoshaParity
                 Note currentNote = _notesBuffer[_notesBuffer.Count - 1];
                 const float sliderPrecision = 59f; // In miliseconds
                 float timeDiff = Math.Abs(currentNote.Seconds * 1000 - nextNote.Seconds * 1000);
-                if (timeDiff <= sliderPrecision)
+
+                if (timeDiff <= sliderPrecision && currentNote is not TempChain)
                 {
                     if (nextNote.CutDirection == 8 || currentNote.CutDirection == 8 ||
                         currentNote.CutDirection == nextNote.CutDirection || Math.Abs(ParityUtils.ForehandDict(true)[currentNote.CutDirection] - ParityUtils.ForehandDict(true)[nextNote.CutDirection]) <= 45 ||

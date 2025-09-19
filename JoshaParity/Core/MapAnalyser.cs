@@ -50,7 +50,18 @@ namespace JoshaParity
             List<Arc> arcs = new(data.Arcs);
             List<Chain> chains = new(data.Chains);
 
+            notes = notes.Select(x => { x.Seconds = bpmHandler.ToRealTime(x.Beats); x.CutDirection = Validate(x.CutDirection); return x; }).ToList();
+            bombs = bombs.Select(x => { x.Seconds = bpmHandler.ToRealTime(x.Beats); return x; }).ToList();
+            obstacles = obstacles.Select(x => { x.Seconds = bpmHandler.ToRealTime(x.Beats); return x; }).ToList();
+            arcs = arcs.Select(x => { x.Seconds = bpmHandler.ToRealTime(x.Beats); x.TailInSeconds = bpmHandler.ToRealTime(x.TailInBeats); x.CutDirection = Validate(x.CutDirection); return x; }).ToList();
+            chains = chains.Select(x => { x.Seconds = bpmHandler.ToRealTime(x.Beats); x.TailInSeconds = bpmHandler.ToRealTime(x.TailInBeats); x.CutDirection = Validate(x.CutDirection); return x; }).ToList();
+
             return new MapObjects(notes, bombs, obstacles, arcs, chains);
+        }
+
+        internal static int Validate(int d)
+        {
+            return (d > 8) ? 8 : (d < 0) ? 0 : d;
         }
 
         /// <summary>

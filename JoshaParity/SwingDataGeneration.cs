@@ -75,7 +75,10 @@ namespace JoshaParity
             mapObjects.Notes.RemoveAll(x => x.Seconds * 1000 < curState.timeValue);
             mapObjects.Chains.RemoveAll(x => x.Seconds * 1000 < curState.timeValue);
 
-            List<Note> parityObjects = TempChain.PreprocessDataForBuffer(mapObjects.Chains).Cast<Note>().ToList();
+            List<TempChain> tempChains = TempChain.PreprocessDataForBuffer(mapObjects.Chains).ToList();
+            List<Note> parityObjects = new(mapObjects.Notes);
+            parityObjects.AddRange(tempChains);
+            parityObjects = parityObjects.OrderBy(x => x.Beats).ToList();
 
             if (parityObjects.Count == 0) { return curState; }
 
@@ -143,10 +146,9 @@ namespace JoshaParity
             SwingData sData = new(type, notes, isRightHand, firstSwing);
             sData.swingStartSeconds = BpmHandler.ToRealTime(sData.swingStartBeat);
             sData.swingEndSeconds = BpmHandler.ToRealTime(sData.swingEndBeat);
-
             // If first we leave
             if (firstSwing) return sData;
-
+            
             // Get previous swing
             SwingData lastSwing = isRightHand ?
                 curState.RightHandSwings[curState.RightHandSwings.Count - 1] :
@@ -156,6 +158,7 @@ namespace JoshaParity
             Note lastNote = lastSwing.notes[lastSwing.notes.Count - 1];
             Note currentNote = sData.notes[0];
             sData.swingEBPM = TimeUtils.SwingEBPM(BpmHandler, lastNote.Beats, currentNote.Beats);
+
             if (lastSwing.IsReset) { sData.swingEBPM *= 2; }
 
             // Calculate Parity
@@ -163,7 +166,7 @@ namespace JoshaParity
 
             // Setting angles for: Single-Note Swings
             if (sData.notes.Count == 1) {
-                if (sData.notes.All(x => x.CutDirection == 8)) { 
+                if (sData.notes.All(x => x.CutDirection == 8)) {
                     SwingUtils.DotCutDirectionCalc(lastSwing, ref sData, true); 
                 } else {
                     // Get Parity Dictionary
@@ -177,16 +180,15 @@ namespace JoshaParity
                 // Setting angles for: Multi-note Snapped Swings
                 if (sData.notes.All(x => Math.Abs(sData.notes[0].Beats - x.Beats) < 0.01f)) {
                     // Snapped all dots, else:
-                    if (sData.notes.All(x => x.CutDirection == 8)) { 
+                    if (sData.notes.All(x => x.CutDirection == 8)) {
                         SwingUtils.SnappedDotSwingAngleCalc(lastSwing, ref sData); 
-                    } else { 
+                    } else {
                         SwingUtils.SliderAngleCalc(ref sData); 
                     }
                 } else {
                     SwingUtils.SliderAngleCalc(ref sData);
                 }
             }
-
             // Temporary Angle Flip till lean is fully implemented:
             if (sData.upsideDown)
             {
@@ -196,7 +198,6 @@ namespace JoshaParity
                     sData.SetEndAngle(sData.endPos.rotation * -1);
                 }
             }
-
             return sData;
         }
 
