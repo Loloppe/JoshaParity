@@ -38,6 +38,14 @@ namespace JoshaParity
         }
 
         /// <summary>
+        /// Constructor with existing data
+        /// </summary>
+        public DiffAnalysis(BeatmapV3 beatmap, DifficultySet difficultySet, IParityMethod? parityMethod = null)
+        {
+            Init(beatmap, difficultySet, parityMethod);
+        }
+
+        /// <summary>
         /// Constructor with Info.dat
         /// </summary>
         public DiffAnalysis(List<(string filename, string json)> data, string difficultyName, float songLength, IParityMethod? parityMethod = null)
