@@ -60,7 +60,7 @@ namespace JoshaParity
         /// </summary>
         private void Init(BeatmapV3 beatmap, DifficultySet data, IParityMethod? parityMethod = null)
         {
-            Timescale bpmHandler = Timescale.Create(beatmap.Info._beatsPerMinute, data.Data.bpmEvents, beatmap.Info._songTimeOffset);
+            bpmHandler = Timescale.Create(beatmap.Info._beatsPerMinute, data.Data.bpmEvents, beatmap.Info._songTimeOffset);
             IParityMethod ParityMethodology = parityMethod ?? new GenericParityCheck();
             mapObjects = MapAnalyser.MapObjectsFromDiff(data.Data, bpmHandler);
             swingContainer = SwingDataGeneration.Run(mapObjects, bpmHandler, ParityMethodology);
@@ -112,11 +112,9 @@ namespace JoshaParity
             List<SwingData> rightHand = swingContainer.RightHandSwings.ToList();
 
             float leftSPS = (leftHand.Count == 0) ?
-                0 : leftHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(),
-                    leftHand.Last().swingEndBeat - leftHand.First().swingStartBeat);
+                0 : leftHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(), leftHand.Last().swingEndBeat - leftHand.First().swingStartBeat);
             float rightSPS = (rightHand.Count == 0) ?
-                0 : rightHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(),
-                    rightHand.Last().swingEndBeat - rightHand.First().swingStartBeat);
+                0 : rightHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(), rightHand.Last().swingEndBeat - rightHand.First().swingStartBeat);
 
             // Depending on result type, return SPS
             return hand switch
