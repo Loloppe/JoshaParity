@@ -38,6 +38,14 @@ namespace JoshaParity
         }
 
         /// <summary>
+        /// Constructor with existing data
+        /// </summary>
+        public DiffAnalysis(BeatmapV3 beatmap, DifficultySet difficultySet, IParityMethod? parityMethod = null)
+        {
+            Init(beatmap, difficultySet, parityMethod);
+        }
+
+        /// <summary>
         /// Constructor with Info.dat
         /// </summary>
         public DiffAnalysis(List<(string filename, string json)> data, string difficultyName, float songLength, IParityMethod? parityMethod = null)
@@ -52,7 +60,6 @@ namespace JoshaParity
         /// </summary>
         private void Init(BeatmapV3 beatmap, DifficultySet data, IParityMethod? parityMethod = null)
         {
-            Timescale
             bpmHandler = Timescale.Create(beatmap.Info._beatsPerMinute, data.Data.bpmEvents, beatmap.Info._songTimeOffset);
             IParityMethod ParityMethodology = parityMethod ?? new GenericParityCheck();
             mapObjects = MapAnalyser.MapObjectsFromDiff(data.Data, bpmHandler);
@@ -77,7 +84,7 @@ namespace JoshaParity
         {
             int handColour = hand == HandResult.Left ? 0 : 1;
             IEnumerable<Note> notes = hand == HandResult.Both ? mapObjects.Notes : mapObjects.Notes.Where(n => n.Color == handColour);
-            notes.OrderBy(x => x.Beats);
+            notes = notes.OrderBy(x => x.Seconds * 1000);
             return notes.Any() ? notes.Count() / (notes.Last().Seconds - notes.First().Seconds) : 0;
         }
 
@@ -105,11 +112,9 @@ namespace JoshaParity
             List<SwingData> rightHand = swingContainer.RightHandSwings.ToList();
 
             float leftSPS = (leftHand.Count == 0) ?
-                0 : leftHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(),
-                    leftHand.Last().swingEndBeat - leftHand.First().swingStartBeat);
+                0 : leftHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(), leftHand.Last().swingEndBeat - leftHand.First().swingStartBeat);
             float rightSPS = (rightHand.Count == 0) ?
-                0 : rightHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(),
-                    rightHand.Last().swingEndBeat - rightHand.First().swingStartBeat);
+                0 : rightHand.Count / TimeUtils.BeatToSeconds(bpmHandler.GetValue(), rightHand.Last().swingEndBeat - rightHand.First().swingStartBeat);
 
             // Depending on result type, return SPS
             return hand switch
