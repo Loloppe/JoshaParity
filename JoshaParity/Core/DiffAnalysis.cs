@@ -42,7 +42,7 @@ namespace JoshaParity
         /// </summary>
         public DiffAnalysis(List<(string filename, string json)> data, string difficultyName, float songLength, IParityMethod? parityMethod = null)
         {
-            var mapInfo = parser.TryLoadString(data, songLength).FirstOrDefault();
+            var mapInfo = parser.TryLoadString(data, songLength);
             var diff = mapInfo.Difficulties.Where(x => x.Difficulty == difficultyName).FirstOrDefault();
             Init(mapInfo, diff, parityMethod);
         }
